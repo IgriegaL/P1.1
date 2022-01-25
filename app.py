@@ -1,8 +1,7 @@
 from flask import Flask
 from flask import render_template
 from flask import render_template, request, redirect, url_for
-from forms import SignupForm
-
+from forms import SignupForm, PostForm
 from flask_login import LoginManager
 
 app = Flask(__name__)
@@ -21,11 +20,6 @@ def index():
 def show_post(slug):
     return render_template("post_view.html", slug_title=slug)
 
-@app.route("/admin/post/")
-@app.route("/admin/post/<int:post_id>/")
-def post_form(post_id=None):
-    return render_template("admin/post_form.html", post_id=post_id)
-
 @app.route("/signup/", methods=["GET", "POST"])
 def show_signup_form():
     form = SignupForm()
@@ -39,7 +33,7 @@ def show_signup_form():
         return redirect(url_for('index'))
     return render_template("signup_form.html", form=form)
 
-from forms import SignupForm, PostForm
+
 @app.route("/admin/post/", methods=['GET', 'POST'], defaults={'post_id': None})
 @app.route("/admin/post/<int:post_id>/", methods=['GET', 'POST'])
 def post_form(post_id):
