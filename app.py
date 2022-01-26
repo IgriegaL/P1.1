@@ -1,13 +1,26 @@
+from models import users
 from flask import Flask
 from flask import render_template
 from flask import render_template, request, redirect, url_for
 from forms import SignupForm, PostForm
 from flask_login import LoginManager
+from werkzeug.urls import url_parse
+from flask_login import login_user, logout_user, current_user, login_required
+from flask_sqlalchemy import SQLAlchemy
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '7110c8ae51a4b5af97be6534caef90e4bb9bdcb3380af008f90b23a5d1616bf319bc298105da20fe'
 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:''@localhost/appbd1'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 login_manager = LoginManager(app)
+login_manager.login_view = "login"
+
+db = SQLAlchemy(app)
+
+
 
 posts = []
 
@@ -22,20 +35,28 @@ def show_post(slug):
 
 @app.route("/signup/", methods=["GET", "POST"])
 def show_signup_form():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
     form = SignupForm()
-    if form.validate_on_submit(): #método validate_on_submit(). Este método comprueba por nosotros que se ha enviado el formulario y que todos sus campos son válidos.
+    if form.validate_on_submit():
         name = form.name.data
         email = form.email.data
         password = form.password.data
-        next = request.args.get('next', None)
-        if next:
-            return redirect(next)
-        return redirect(url_for('index'))
+        # Creamos el usuario y lo guardamos
+        user = User(len(users) + 1, name, email, password)
+        users.append(user)
+        # Dejamos al usuario logueado
+        login_user(user, remember=True)
+        next_page = request.args.get('next', None)
+        if not next_page or url_parse(next_page).netloc != '':
+            next_page = url_for('index')
+        return redirect(next_page)
     return render_template("signup_form.html", form=form)
 
 
 @app.route("/admin/post/", methods=['GET', 'POST'], defaults={'post_id': None})
 @app.route("/admin/post/<int:post_id>/", methods=['GET', 'POST'])
+@login_required
 def post_form(post_id):
     form = PostForm()
     if form.validate_on_submit():
@@ -46,3 +67,33 @@ def post_form(post_id):
         posts.append(post)
         return redirect(url_for('index'))
     return render_template("admin/post_form.html", form=form)
+
+@login_manager.user_loader
+def load_user(user_id):
+    for user in UserString:
+        if user.id == int(user_id):
+            return user
+    return None
+
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = get_user(form.email.data)
+        if user is not None and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            next_page = request.args.get('next')
+            if not next_page or url_parse(next_page).netloc != '':
+                next_page = url_for('index')
+            return redirect(next_page)
+    return render_template('login_form.html', form=form)
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
